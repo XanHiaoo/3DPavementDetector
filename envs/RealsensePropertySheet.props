@@ -3,11 +3,11 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <IncludePath>C:\Users\xiao\Desktop\librealsense\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\code\qt\bishe\librealsense\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <Link>
-      <AdditionalDependencies>C:\Users\xiao\Desktop\librealsense_build\Release\realsense2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>E:\code\qt\bishe\librealsense_build\Release\realsense2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup />

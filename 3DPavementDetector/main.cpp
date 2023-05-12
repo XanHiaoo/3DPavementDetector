@@ -42,6 +42,8 @@ int main()
     // 初始化可视化器
     pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
     viewer->setBackgroundColor(1.0, 1.0, 1.0);
+    viewer->setCameraPosition(0, 0, -2, 0, 0, 0);
+
     // Declare pointcloud object, for calculating pointclouds and texture mappings
     rs2::pointcloud pc;
     // We want the points object to be persistent so we can display the last cloud when a frame drops
@@ -52,7 +54,7 @@ int main()
     // Start streaming with default recommended configuration
     pipe.start();
     PavementDetector* detector = new PavementDetector();
-    
+       
     while(true)
     {
         // Wait for the next set of frames from the camera
@@ -65,6 +67,8 @@ int main()
 
         auto cloud = points_to_pcl(points);
         detector->detect(cloud,viewer);
+
+        viewer->spinOnce(33);
     }
     return 0;
 }

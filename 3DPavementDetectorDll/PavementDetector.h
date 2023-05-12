@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <pcl/visualization/pcl_visualizer.h>
 
 #ifdef PAVEMENTDETECTOR_EXPORTS
 #define PAVEMENT_DETECTOR_API __declspec(dllexport)
@@ -33,7 +34,7 @@ class PAVEMENT_DETECTOR_API PavementDetector
 public:
 	PavementDetector();
 	~PavementDetector();
-	void detect(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud, const pcl::visualization::PCLVisualizer::Ptr viewer);
+	void detect(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud, pcl::visualization::PCLVisualizer::Ptr viewer);
 	DetectionResult getResult();
 
 private:
