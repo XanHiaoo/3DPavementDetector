@@ -24,7 +24,7 @@ public:
 
 private:
 	Ui::MainWindowClass ui;
-	PavementDetector* detector;
+	//PavementDetector* detector;
 	rs2::pipeline pipe;
 	rs2::pointcloud pc;
 	rs2::points points;
