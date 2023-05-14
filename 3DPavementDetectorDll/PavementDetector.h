@@ -23,8 +23,16 @@ enum DETECTION_RESULT_CODE : int
 struct PAVEMENT_DETECTOR_API DetectionResult
 {
 	DETECTION_RESULT_CODE code = DETECTION_OK;
+
+	std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> bulge;
+	std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> hole;
+
+	std::vector<float> bulgeArea;
+	std::vector<float> holeArea;
+
 	int bulgeNum = 0;
-	int HoleNum = 0;
+	int holeNum = 0;
+	
 };
 
 class PavementDetectorImpl;
@@ -34,7 +42,7 @@ class PAVEMENT_DETECTOR_API PavementDetector
 public:
 	PavementDetector();
 	~PavementDetector();
-	void detect(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud, pcl::visualization::PCLVisualizer::Ptr viewer);
+	void detect(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud);
 	DetectionResult getResult();
 
 private:

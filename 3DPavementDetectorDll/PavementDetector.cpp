@@ -14,9 +14,9 @@ PavementDetector::~PavementDetector()
 	delete detector;
 }
 
-void PavementDetector::detect(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud, pcl::visualization::PCLVisualizer::Ptr viewer)
+void PavementDetector::detect(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud)
 {
-	detector->detect(inputCloud, viewer);
+	detector->detect(inputCloud);
 }
 
 DetectionResult PavementDetector::getResult()

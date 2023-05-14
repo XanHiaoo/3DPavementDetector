@@ -76,7 +76,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr removeOutliers(pcl::PointCloud<pcl::PointXYZ
     return cloud_removal;
 }
 
-void segmentCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr& inlier_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr& outlier_cloud, float& sum_z) {
+void segmentCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr& inlier_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr& outlier_cloud, float& avg_z_threshold) {
     pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
     pcl::SACSegmentation<pcl::PointXYZ> seg;
@@ -89,7 +89,7 @@ void segmentCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl
 
     inlier_cloud.reset(new pcl::PointCloud<pcl::PointXYZ>());
     outlier_cloud.reset(new pcl::PointCloud<pcl::PointXYZ>());
-    sum_z = 0.0;
+    float sum_z = 0.0;
 
     for (int i = 0; i < cloud->size(); i++) {
         pcl::PointXYZ point = cloud->at(i);
@@ -102,6 +102,13 @@ void segmentCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl
             // Point is outlier (not part of plane)
             outlier_cloud->push_back(point);
         }
+    }
+    if (inlier_cloud->empty()) {
+        std::cout << "Inlier cloud is empty, cannot compute average z value" << std::endl;
+    }
+    else {
+        avg_z_threshold = sum_z / inlier_cloud->size();
+        std::cout << "Inlier cloud average z value: " << avg_z_threshold << std::endl;
     }
 }
 
@@ -120,13 +127,8 @@ void euclideanClusterExtraction(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud
     ec.extract(cluster_indices);
 }
 
-void visualizeConvexHulls(const std::vector<pcl::PointIndices>& cluster_indices, const pcl::PointCloud<pcl::PointXYZ>::Ptr outlier_cloud, pcl::visualization::PCLVisualizer::Ptr viewer, float avg_z_threshold) {
-    viewer->removeAllPointClouds();
-    viewer->removeAllShapes();
-
-    int v1(0);
-    viewer->createViewPort(0.0, 0.0, 0.5, 1.0, v1);
-    viewer->setBackgroundColor(1.0, 1.0, 1.0, v1);
+void PavementDetectorImpl::getRoadDiseases(std::vector<pcl::PointIndices>& cluster_indices,const pcl::PointCloud<pcl::PointXYZ>::Ptr& outlier_cloud ,float avg_z_threshold) {
+    
     // Compute the convex hull for each cluster
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
     {
@@ -138,20 +140,10 @@ void visualizeConvexHulls(const std::vector<pcl::PointIndices>& cluster_indices,
             avg_z += outlier_cloud->points[*pit].z;
         }
         avg_z /= it->indices.size();
+        cout << "avg_z:" << avg_z << endl;
+        cout << "avg_z_th" << avg_z_threshold << endl;
 
-        float r, g, b;
-        if (avg_z > avg_z_threshold) {
-            // 绿色
-            r = 0.0;
-            g = 1.0;
-            b = 0.0;
-        }
-        else {
-            // 红色
-            r = 1.0;
-            g = 0.0;
-            b = 0.0;
-        }
+        
         pcl::PointCloud<pcl::PointXYZ>::Ptr convex_hull(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::ConvexHull<pcl::PointXYZ> chull;
         chull.setInputCloud(cluster_cloud);
@@ -175,28 +167,29 @@ void visualizeConvexHulls(const std::vector<pcl::PointIndices>& cluster_indices,
 
         // Add the convex hull and cluster to the visualization
         if (surface_area > 0.01) {
-            viewer->addPointCloud<pcl::PointXYZ>(convex_hull, "convex_hull_" + std::to_string(it - cluster_indices.begin()),v1);
-            viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.5, 1.0, "convex_hull_" + std::to_string(it - cluster_indices.begin()));
-            viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "convex_hull_" + std::to_string(it - cluster_indices.begin()));
-            viewer->addPointCloud<pcl::PointXYZ>(cluster_cloud, "cluster_" + std::to_string(it - cluster_indices.begin()),v1);
-            viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, r, g, b, "cluster_" + std::to_string(it - cluster_indices.begin()));
-            viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "cluster_" + std::to_string(it - cluster_indices.begin()));
-            viewer->addText3D(avg_z < avg_z_threshold ? "hole" : "bulge" + std::to_string(it - cluster_indices.begin()), pcl::PointXYZ(cluster_cloud->points[0].x, cluster_cloud->points[0].y, cluster_cloud->points[0].z + 0.1), 0.03, 1.0, 0.5, 1.0, "text_" + std::to_string(it - cluster_indices.begin()),v1);
+            if (avg_z < avg_z_threshold) {
+                bulge.push_back(cluster_cloud);
+                bulgeArea.push_back(surface_area / 2);
+            }
+            else {
+                hole.push_back(cluster_cloud);
+                holeArea.push_back(surface_area / 2);
+            }
         }
     }
 }
 
-void PavementDetectorImpl::detect(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud,pcl::visualization::PCLVisualizer::Ptr viewer)
+void PavementDetectorImpl::detect(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud)
 {
     cloudOrg = inputCloud;
-    detectDefects(inputCloud,viewer);
+    detectDefects(inputCloud);
 }
 
-void PavementDetectorImpl::detectDefects(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud, pcl::visualization::PCLVisualizer::Ptr viewer)
+void PavementDetectorImpl::detectDefects(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud)
 {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
     cloud = cloudOrg;
-
+    
     //去除NAN和极大值
     removeNaNAndInfFromPointCloud(cloud);
 
@@ -212,36 +205,39 @@ void PavementDetectorImpl::detectDefects(const pcl::PointCloud<pcl::PointXYZ>::P
     pcl::PointCloud<pcl::PointXYZ>::Ptr inlier_cloud(new pcl::PointCloud<pcl::PointXYZ>());
     pcl::PointCloud<pcl::PointXYZ>::Ptr outlier_cloud(new pcl::PointCloud<pcl::PointXYZ>());
     
-    float sum_z = 0.0;
     float avg_z_threshold = 1.0;
     segmentCloud(cloud_removal, inlier_cloud, outlier_cloud, avg_z_threshold);
-
-    if (inlier_cloud->empty()) {
-        std::cout << "Inlier cloud is empty, cannot compute average z value" << std::endl;
-    }
-    else {
-        avg_z_threshold = sum_z / inlier_cloud->size();
-        std::cout << "Inlier cloud average z value: " << avg_z_threshold << std::endl;
-    }
 
     //平面外点云聚类
     std::vector<pcl::PointIndices> cluster_indices;
     euclideanClusterExtraction(outlier_cloud, 0.05, 100, 100000, cluster_indices);
 
-    //显示聚类
-    visualizeConvexHulls(cluster_indices, outlier_cloud, viewer, avg_z_threshold);
+    //判断病害类型
+    bulge.clear();
+    hole.clear();
+    bulgeArea.clear();
+    holeArea.clear();
+    getRoadDiseases(cluster_indices, outlier_cloud,avg_z_threshold);
 
-    int v2(0);
-    viewer->createViewPort(0.5, 0.0, 1.0, 1.0, v2);
-    viewer->setBackgroundColor(1.0, 1.0, 1.0, v2);
-    /*viewer->addPointCloud<pcl::PointXYZ>(inlier_cloud, "inliers");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "inliers",v2); */
-    viewer->addPointCloud<pcl::PointXYZ>(cloud, "cloud",v2);
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "cloud", v2);
 }
 
 DetectionResult PavementDetectorImpl::getResult()
 {
-    detectionResult = DetectionResult();   
+    detectionResult = DetectionResult();
+
+    detectionResult.bulgeNum = bulge.size();
+    detectionResult.holeNum = hole.size();
+    if (!detectionResult.bulgeNum && !detectionResult.holeNum) {
+        detectionResult.code = DETECTION_OK;
+    }
+    else {
+        detectionResult.code = DETECTION_NG;
+
+        detectionResult.bulge = bulge;
+        detectionResult.hole = hole;
+
+        detectionResult.bulgeArea = bulgeArea;
+        detectionResult.holeArea = holeArea;
+    }
     return detectionResult;
 }
