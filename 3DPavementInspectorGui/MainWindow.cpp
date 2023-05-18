@@ -31,6 +31,9 @@
 #include <QTimer>
 #include <pcl/visualization/vtk.h>
 #include "widgets/NewSolutionDialog.h"
+#include <QDesktopServices>
+#include <QUrl>
+#include "controllers/SavePCDThread.h"
 
 using pcl_ptr_xyzrgb = pcl::PointCloud<pcl::PointXYZRGB>::Ptr;
 pcl_ptr_xyzrgb points_to_pcl_xyzrgb1(const rs2::points& points, const rs2::video_frame& color)
@@ -115,9 +118,10 @@ void MainWindow::_setupActionList()
 {
     fileRelatedActions << ui.actionOpen_File
         << ui.actionOpen_Dir
-        << ui.action_openCamera,
+        << ui.action_openCamera
+        << ui.action_openOutputDir;
 
-        detectRelatedActions << ui.actionNext_Image
+    detectRelatedActions << ui.actionNext_Image
         << ui.actionZoom_in
         << ui.actionZoom_out
         << ui.actionFit_Window
@@ -125,9 +129,9 @@ void MainWindow::_setupActionList()
         << ui.action_pause
         << ui.actionPrevious_Image
         << ui.action_Unload
-        << ui.actionLoad,
+        << ui.actionLoad;
 
-        allRelatedActions << ui.actionOpen_File
+    allRelatedActions << ui.actionOpen_File
         << ui.actionOpen_Dir
         << ui.actionNext_Image
         << ui.actionZoom_in
@@ -184,8 +188,12 @@ void MainWindow::_setupCameraManager() {
 }
 
 void MainWindow::_setupPointCloudCameraManager() {
-    connect(&pointCloudCameraManager, &PointCloudCameraManager::newPointCloud, this, &MainWindow::updatePonitCloudFrame);
+    //connect(&pointCloudCameraManager, &PointCloudCameraManager::newPointCloud, this, &MainWindow::updatePonitCloudFrame);
     //connect(&pointCloudCameraManager, &PointCloudCameraManager::clearPlayer, this, &MainWindow::clearPlayer);
+    pointCloudDetectTimer_ = new QTimer(this);
+    pointCloudDetectTimer_->setInterval(50); // 50ms
+    connect(pointCloudDetectTimer_, &QTimer::timeout, this, &MainWindow::onDetectTimerTimeout);
+    
 }
 
 /*--------------------------------界面初始化----------------------------*/
@@ -232,6 +240,7 @@ void MainWindow::on_action_newSln_triggered()
     out_project << "<project>" << Qt::endl;
     out_project << "  <name>" << projectName << "</name>" << Qt::endl;
     out_project << "  <created>" << QDateTime::currentDateTime().toString(Qt::ISODate) << "</created>" << Qt::endl;
+    out_project << "  <outputPath>" << projectDir + "/output" << "</outputPath>" << Qt::endl; // 将输出路径写入XML
     out_project << "</project>" << Qt::endl;
     projectFile.close();
 
@@ -242,6 +251,7 @@ void MainWindow::on_action_newSln_triggered()
 
     projectManager.setProjectPath(projectDir);
     projectManager.setOutputPath(projectDir + "/output");
+    projectManager.setProjectName(projectName);
 
     enableFileActions();
 
@@ -298,12 +308,14 @@ void MainWindow::on_action_newProj_triggered()
             out << "<project>" << Qt::endl;
             out << "  <name>" << projectName << "</name>" << Qt::endl;
             out << "  <created>" << QDateTime::currentDateTime().toString(Qt::ISODate) << "</created>" << Qt::endl;
+            out << "  <outputPath>" << outputPath << "</outputPath>" << Qt::endl; // 将输出路径写入XML
             out << "</project>" << Qt::endl;
 
             projectFile.close();
             QMessageBox::information(this, tr("项目创建成功"), tr("项目已创建在 %1").arg(folderPath));
             projectManager.setProjectPath(folderPath);
             projectManager.setOutputPath(outputPath);
+            projectManager.setProjectName(projectName);
 
             enableFileActions();
 
@@ -314,21 +326,76 @@ void MainWindow::on_action_newProj_triggered()
     }
 }
 
+//void MainWindow::on_action_openProj_triggered()
+//{
+//    QString fileName = QFileDialog::getOpenFileName(this, "Open Project", "", "Project Files (*.proj)");
+//
+//    if (!fileName.isEmpty()) {
+//        // do something with the selected file
+//        projectManager.setProjectPath(fileName);
+//        //projectManager.setOutputPath(fileName + "/output");
+//
+//        qDebug() << projectManager.outputPath();
+//        enableFileActions();
+//
+//        QDateTime current_date_time = QDateTime::currentDateTime();
+//        QString current_date_time_str = current_date_time.toString("hh:mm:ss");
+//        ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已加载项目" + QString(fileName).section('/', -1));
+//    }
+//
+//}
+
 void MainWindow::on_action_openProj_triggered()
 {
     QString fileName = QFileDialog::getOpenFileName(this, "Open Project", "", "Project Files (*.proj)");
 
     if (!fileName.isEmpty()) {
-        // do something with the selected file
-        projectManager.setProjectPath(fileName);
-        projectManager.setOutputPath(fileName + "/output");
-        enableFileActions();
+        QFile projectFile(fileName);
+        if (!projectFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QMessageBox::warning(this, tr("打开项目文件失败"), tr("无法打开项目文件"));
+            return;
+        }
 
-        QDateTime current_date_time = QDateTime::currentDateTime();
-        QString current_date_time_str = current_date_time.toString("hh:mm:ss");
-        ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已加载项目" + QString(fileName).section('/', -1));
+        // 读取项目文件内容
+        QXmlStreamReader xmlReader(&projectFile);
+        QString outputPath;
+        QString projectName;
+
+        while (!xmlReader.atEnd() && !xmlReader.hasError()) {
+            QXmlStreamReader::TokenType token = xmlReader.readNext();
+
+            if (token == QXmlStreamReader::StartElement) {
+                if (xmlReader.name().toString().compare("outputPath") == 0) {
+                    xmlReader.readNext();
+                    outputPath = xmlReader.text().toString();
+                    //break;
+                }
+                if (xmlReader.name().toString().compare("name") == 0) {
+                    xmlReader.readNext();
+                    projectName = xmlReader.text().toString();
+                    //break;
+                }
+            }
+        }
+
+        projectFile.close();
+
+        if (!outputPath.isEmpty()) {
+            projectManager.setProjectPath(fileName);
+            projectManager.setOutputPath(outputPath);
+            projectManager.setProjectName(projectName);
+
+            qDebug() << projectManager.outputPath();
+            enableFileActions();
+
+            QDateTime current_date_time = QDateTime::currentDateTime();
+            QString current_date_time_str = current_date_time.toString("hh:mm:ss");
+            ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已加载项目" + QString(fileName).section('/', -1));
+        }
+        else {
+            QMessageBox::warning(this, tr("无效的项目文件"), tr("项目文件中缺少输出路径信息"));
+        }
     }
-
 }
 
 void MainWindow::on_actionOpen_File_triggered()
@@ -390,55 +457,66 @@ void MainWindow::on_actionOpen_Dir_triggered()
 
 void MainWindow::on_action_run_triggered()
 {
-    if (!timer.isActive()) {
-        if (!capture.isOpened()) {
-            if (fileManager.count() > 0) {
-                QString currentFile = fileManager.getCurrentImageFile();
-                if (fileManager.getMode() == Video) {
-                    // If the current file is a video, open it using cv::VideoCapture
-                    capture.open(currentFile.toStdString());
-                }
-                else {
-                    // If the current file is a folder, play all image files as a video
-                    QStringList imageFiles = fileManager.allImageFiles();
-                    if (imageFiles.length() > 0) {
-                        std::vector<cv::Mat> frames;
-                        for (const QString& fileName : imageFiles) {
-                            cv::Mat frame = cv::imread(fileName.toStdString());
-                            if (frame.empty()) {
-                                // Skip empty frames
-                                continue;
-                            }
-                            frames.push_back(frame);
-                        }
-                        if (frames.size() > 0) {
-                            // Create a video writer and write the frames as a video
-                            cv::VideoWriter writer;
-                            QString outputPath = fileManager.getDir(currentFile) + "output.avi";
-                            int codec = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
-                            writer.open(outputPath.toStdString(), codec, 30, frames[0].size());
-                            if (writer.isOpened()) {
-                                for (const cv::Mat& frame : frames) {
-                                    writer.write(frame);
+    if (cameraManager.getMode() == cameraOpen) {
+        if (!timer.isActive()) {
+            if (!capture.isOpened()) {
+                if (fileManager.count() > 0) {
+                    QString currentFile = fileManager.getCurrentImageFile();
+                    if (fileManager.getMode() == Video) {
+                        // If the current file is a video, open it using cv::VideoCapture
+                        capture.open(currentFile.toStdString());
+                    }
+                    else {
+                        // If the current file is a folder, play all image files as a video
+                        QStringList imageFiles = fileManager.allImageFiles();
+                        if (imageFiles.length() > 0) {
+                            std::vector<cv::Mat> frames;
+                            for (const QString& fileName : imageFiles) {
+                                cv::Mat frame = cv::imread(fileName.toStdString());
+                                if (frame.empty()) {
+                                    // Skip empty frames
+                                    continue;
                                 }
-                                writer.release();
-                                capture.open(outputPath.toStdString());
+                                frames.push_back(frame);
                             }
-                            else {
-                                qWarning() << "Failed to open video writer for" << outputPath;
+                            if (frames.size() > 0) {
+                                // Create a video writer and write the frames as a video
+                                cv::VideoWriter writer;
+                                QString outputPath = fileManager.getDir(currentFile) + "output.avi";
+                                int codec = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
+                                writer.open(outputPath.toStdString(), codec, 30, frames[0].size());
+                                if (writer.isOpened()) {
+                                    for (const cv::Mat& frame : frames) {
+                                        writer.write(frame);
+                                    }
+                                    writer.release();
+                                    capture.open(outputPath.toStdString());
+                                }
+                                else {
+                                    qWarning() << "Failed to open video writer for" << outputPath;
+                                }
                             }
                         }
                     }
                 }
             }
+            connect(&timer, SIGNAL(timeout()), this, SLOT(update_frame()));
+
+            QDateTime current_date_time = QDateTime::currentDateTime();
+            QString current_date_time_str = current_date_time.toString("hh:mm:ss");
+            ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已开始检测离线序列");
+
+            timer.start(33); // 设置30fps的帧率
         }
-        connect(&timer, SIGNAL(timeout()), this, SLOT(update_frame()));
-
-        QDateTime current_date_time = QDateTime::currentDateTime();
-        QString current_date_time_str = current_date_time.toString("hh:mm:ss");
-        ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已开始检测离线序列");
-
-        timer.start(33); // 设置30fps的帧率
+    }
+    if (pointCloudCameraManager.getMode() == PointCloudcameraOpen) {
+        if (!pointCloudDetectTimer_->isActive()) {
+            //pipe_.start();
+            pointCloudDetectTimer_->start();
+            QDateTime current_date_time = QDateTime::currentDateTime();
+            QString current_date_time_str = current_date_time.toString("hh:mm:ss");
+            ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已继续三维检测");
+        }
     }
 }
 
@@ -450,6 +528,13 @@ void MainWindow::on_action_pause_triggered()
         QDateTime current_date_time = QDateTime::currentDateTime();
         QString current_date_time_str = current_date_time.toString("hh:mm:ss");
         ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已暂停检测");
+    }
+    if (pointCloudDetectTimer_->isActive()) {
+        pointCloudDetectTimer_->stop(); // stop the timer to pause the video playback
+        //pipe_.stop();
+        QDateTime current_date_time = QDateTime::currentDateTime();
+        QString current_date_time_str = current_date_time.toString("hh:mm:ss");
+        ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已暂停三维检测");
     }
 }
 
@@ -610,6 +695,29 @@ void MainWindow::on_actionAbout_triggered()
     QMessageBox::about(this, "About", about_text);
 }
 
+void MainWindow::on_actionAuto_Save_triggered()
+{
+    if (ui.actionAuto_Save->isChecked()) {
+        autoSavePointCloudDetect = true;
+    }
+    else {
+        autoSavePointCloudDetect = false;
+    }
+}
+
+void MainWindow::on_action_openOutputDir_triggered()
+{
+    QString outputDirPath = projectManager.outputPath();
+    QDir outputDir(outputDirPath);
+
+    if (!outputDir.exists()) {
+        QMessageBox::warning(this, tr("路径不存在"), tr("输出路径不存在"));
+        return;
+    }
+
+    QDesktopServices::openUrl(QUrl::fromLocalFile(outputDirPath));
+}
+
 void MainWindow::on_action_pointcloud_detect_triggered()
 {
     if (pointCloudCameraManager.getMode() == PointCloudcameraOpen) {
@@ -617,8 +725,16 @@ void MainWindow::on_action_pointcloud_detect_triggered()
 
         //@TODO 临时写法，待改进
         ui.cameraListWidget->clear();
+        ui.frameListWidget->clear();
         //
 
+        pipe_.stop();
+        /*if (pipe_.start()) {
+            pipe_.stop();
+        }*/
+        pointCloudDetectTimer_->stop();
+        qvtkWidget->hide();
+        ui.image_player->show();
         QDateTime current_date_time = QDateTime::currentDateTime();
         QString current_date_time_str = current_date_time.toString("hh:mm:ss");
         ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已关闭三维相机");
@@ -631,15 +747,14 @@ void MainWindow::on_action_pointcloud_detect_triggered()
     }
     else {
         on_actionUnload_triggered();
-        
-
+        enableDetectActions();
         //@TODO 临时写法，待改进
         QListWidgetItem* item = new QListWidgetItem(QString("intel RealSense D415"));
         ui.cameraListWidget->addItem(item);
 
         QDateTime current_date_time = QDateTime::currentDateTime();
         QString current_date_time_str = current_date_time.toString("hh:mm:ss");
-        ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已打开深度相机实时检测");
+        ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已打开三维相机实时检测");
 
         // 隐藏 QLabel image_player
         ui.image_player->hide();
@@ -663,8 +778,9 @@ void MainWindow::on_action_pointcloud_detect_triggered()
         viewer_->setCameraPosition(0, 0, -2, 0, 0, 0);
         viewer_->setupInteractor(qvtkWidget->interactor(), qvtkWidget->renderWindow());
         pointCloudCameraManager.openCamera();
-    }
-    
+        pipe_.start();
+        pointCloudDetectTimer_->start();
+    }   
 }
 
 //void MainWindow::on_action_pointcloud_detect_triggered()
@@ -692,11 +808,11 @@ void MainWindow::on_action_pointcloud_detect_triggered()
 //    viewer_->setCameraPosition(0, 0, -2, 0, 0, 0);
 //    viewer_->setupInteractor(qvtkWidget->interactor(), qvtkWidget->renderWindow());
 //
-//    timer_ = new QTimer(this);
-//    timer_->setInterval(33); // 50ms
-//    connect(timer_, &QTimer::timeout, this, &MainWindow::onTimerTimeout);
-//    pipe.start();
-//    timer_->start();
+//    pointCloudDetectTimer_ = new QTimer(this);
+//    pointCloudDetectTimer_->setInterval(33); // 50ms
+//    connect(pointCloudDetectTimer_, &QTimer::timeout, this, &MainWindow::onDetectTimerTimeout);
+//    pipe_.start();
+//    pointCloudDetectTimer_->start();
 //}
 /*--------------------------------action槽函数----------------------------*/
 
@@ -729,9 +845,7 @@ void MainWindow::update_frame()
     int frame_number = capture.get(cv::CAP_PROP_POS_FRAMES);
     // 更新自定义列表小部件以显示当前帧数
     QListWidgetItem* item = new QListWidgetItem(QString("Frame %1").arg(frame_number));;
-
     ui.frameListWidget->addItem(item);
-    qDebug() << "Playing frame: " << frame_number;
 }
 
 bool MainWindow::switchFrame(int idx) {
@@ -763,51 +877,51 @@ void MainWindow::updateImage(const cv::Mat& image1, const cv::Mat& image2)
     ui.image_player->setPixmap(QPixmap::fromImage(qt_image));
 }
 
-void MainWindow::updatePonitCloudFrame( const DetectionResult detectionResult, const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_xyzrgb)
-{
-    auto start_time = std::chrono::steady_clock::now();
-    viewer_->removeAllShapes();
-    viewer_->removeAllPointClouds();
-
-    int v1(0);
-    viewer_->createViewPort(0.0, 0.0, 0.5, 1.0, v1);
-    viewer_->setBackgroundColor(1.0, 1.0, 1.0, v1);
-    viewer_->addPointCloud(cloud_xyzrgb, "cloud_v1", v1);
-    int v2(0);
-    viewer_->createViewPort(0.5, 0.0, 1.0, 1.0, v2);
-    viewer_->setBackgroundColor(1.0, 1.0, 1.0, v2);
-    viewer_->addPointCloud(cloud_xyzrgb, "cloud_v2", v2);
-
-    if (detectionResult.code == DETECTION_NG) {
-        // Add each point cloud in bulge to the viewer with a green color
-        for (size_t i = 0; i < detectionResult.bulge.size(); ++i)
-        {
-            std::string cloud_name = "bulge_" + std::to_string(i);
-            viewer_->addPointCloud<pcl::PointXYZ>(detectionResult.bulge[i], cloud_name, v2);
-            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, cloud_name);
-            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, cloud_name);
-            viewer_->addText3D("bulge" + std::to_string(i) + " " + std::to_string(detectionResult.bulgeArea[i]).substr(0, 5),
-                pcl::PointXYZ(detectionResult.bulge[i]->points[0].x, detectionResult.bulge[i]->points[0].y,
-                    detectionResult.bulge[i]->points[0].z + 0.1), 0.02, 0.0, 0.0, 1.0, "text_bulge" + std::to_string(i), v2);
-
-        }
-
-        // Add each point cloud in hole to the viewer with a red color
-        for (size_t i = 0; i < detectionResult.hole.size(); ++i)
-        {
-            std::string cloud_name = "hole_" + std::to_string(i);
-            viewer_->addPointCloud<pcl::PointXYZ>(detectionResult.hole[i], cloud_name, v2);
-            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, cloud_name);
-            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, cloud_name);
-            viewer_->addText3D("hole" + std::to_string(i) + " " + std::to_string(detectionResult.holeArea[i]).substr(0, 5),
-                pcl::PointXYZ(detectionResult.hole[i]->points[0].x, detectionResult.hole[i]->points[0].y,
-                    detectionResult.hole[i]->points[0].z + 0.1), 0.02, 0.0, 0.0, 1.0, "text_hole" + std::to_string(i), v2);
-        }
-    }
-    viewer_->spin();
-    auto end_time = std::chrono::steady_clock::now();
-    qDebug() << "渲染执行时间: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << " ms";
-}
+//void MainWindow::updatePonitCloudFrame( const DetectionResult detectionResult, const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_xyzrgb)
+//{
+//    auto start_time = std::chrono::steady_clock::now();
+//    viewer_->removeAllShapes();
+//    viewer_->removeAllPointClouds();
+//
+//    int v1(0);
+//    viewer_->createViewPort(0.0, 0.0, 0.5, 1.0, v1);
+//    viewer_->setBackgroundColor(1.0, 1.0, 1.0, v1);
+//    viewer_->addPointCloud(cloud_xyzrgb, "cloud_v1", v1);
+//    int v2(0);
+//    viewer_->createViewPort(0.5, 0.0, 1.0, 1.0, v2);
+//    viewer_->setBackgroundColor(1.0, 1.0, 1.0, v2);
+//    viewer_->addPointCloud(cloud_xyzrgb, "cloud_v2", v2);
+//
+//    if (detectionResult.code == DETECTION_NG) {
+//        // Add each point cloud in bulge to the viewer with a green color
+//        for (size_t i = 0; i < detectionResult.bulge.size(); ++i)
+//        {
+//            std::string cloud_name = "bulge_" + std::to_string(i);
+//            viewer_->addPointCloud<pcl::PointXYZ>(detectionResult.bulge[i], cloud_name, v2);
+//            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, cloud_name);
+//            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, cloud_name);
+//            viewer_->addText3D("bulge" + std::to_string(i) + " " + std::to_string(detectionResult.bulgeArea[i]).substr(0, 5),
+//                pcl::PointXYZ(detectionResult.bulge[i]->points[0].x, detectionResult.bulge[i]->points[0].y,
+//                    detectionResult.bulge[i]->points[0].z + 0.1), 0.02, 0.0, 0.0, 1.0, "text_bulge" + std::to_string(i), v2);
+//
+//        }
+//
+//        // Add each point cloud in hole to the viewer with a red color
+//        for (size_t i = 0; i < detectionResult.hole.size(); ++i)
+//        {
+//            std::string cloud_name = "hole_" + std::to_string(i);
+//            viewer_->addPointCloud<pcl::PointXYZ>(detectionResult.hole[i], cloud_name, v2);
+//            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, cloud_name);
+//            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, cloud_name);
+//            viewer_->addText3D("hole" + std::to_string(i) + " " + std::to_string(detectionResult.holeArea[i]).substr(0, 5),
+//                pcl::PointXYZ(detectionResult.hole[i]->points[0].x, detectionResult.hole[i]->points[0].y,
+//                    detectionResult.hole[i]->points[0].z + 0.1), 0.02, 0.0, 0.0, 1.0, "text_hole" + std::to_string(i), v2);
+//        }
+//    }
+//    viewer_->spin();
+//    auto end_time = std::chrono::steady_clock::now();
+//    qDebug() << "渲染执行时间: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << " ms";
+//}
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
@@ -821,6 +935,85 @@ void MainWindow::closeEvent(QCloseEvent* event)
 void MainWindow::clearPlayer()
 {
     ui.image_player->clear();
+}
+
+void MainWindow::onDetectTimerTimeout() {
+    PavementDetector* detector = new PavementDetector();
+    auto frames = pipe_.wait_for_frames();
+    auto depth = frames.get_depth_frame();
+    auto color = frames.get_color_frame();
+    points_ = pc_.calculate(depth);
+    auto cloud_xyzrgb = points_to_pcl_xyzrgb1(points_, color);
+    auto cloud_xyz = points_to_pcl_xyz1(points_);
+    viewer_->removeAllShapes();
+    viewer_->removeAllPointClouds();
+
+    int v1(0);
+    viewer_->createViewPort(0.0, 0.0, 0.5, 1.0, v1);
+    viewer_->setBackgroundColor(1.0, 1.0, 1.0, v1);
+    viewer_->addPointCloud(cloud_xyzrgb, "cloud_v1", v1);
+    //viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.0,1.0,0.0, "cloud");
+    detector->detect(cloud_xyz);
+    DetectionResult detectionResult = detector->getResult();
+
+    int v2(0);
+    viewer_->createViewPort(0.5, 0.0, 1.0, 1.0, v2);
+    viewer_->setBackgroundColor(1.0, 1.0, 1.0, v2);
+    viewer_->addPointCloud(cloud_xyzrgb, "cloud_v2", v2);
+
+    if (detectionResult.code == DETECTION_NG) {
+        ngNum++;
+        // Merge cloud_xyzrgb, bulge, and hole into a single point cloud
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr mergedCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+        *mergedCloud = *cloud_xyzrgb;
+        // Add each point cloud in bulge to the viewer with a green color
+        for (size_t i = 0; i < detectionResult.bulge.size(); ++i)
+        {
+            std::string cloud_name = "bulge_" + std::to_string(i);
+            viewer_->addPointCloud<pcl::PointXYZ>(detectionResult.bulge[i], cloud_name, v2);
+            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, cloud_name);
+            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, cloud_name);
+            viewer_->addText3D("bulge" + std::to_string(i) + " " + std::to_string(detectionResult.bulgeArea[i]).substr(0, 5),
+                pcl::PointXYZ(detectionResult.bulge[i]->points[0].x, detectionResult.bulge[i]->points[0].y,
+                    detectionResult.bulge[i]->points[0].z + 0.1), 0.02, 0.0, 0.0, 1.0, "text_bulge" + std::to_string(i), v2);
+            pcl::PointCloud<pcl::PointXYZRGB>::Ptr bulgePointCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+            pcl::copyPointCloud(*detectionResult.bulge[i], *bulgePointCloud);
+            *mergedCloud += *bulgePointCloud;
+        }
+
+        // Add each point cloud in hole to the viewer with a red color
+        for (size_t i = 0; i < detectionResult.hole.size(); ++i)
+        {
+            std::string cloud_name = "hole_" + std::to_string(i);
+            viewer_->addPointCloud<pcl::PointXYZ>(detectionResult.hole[i], cloud_name, v2);
+            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, cloud_name);
+            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, cloud_name);
+            viewer_->addText3D("hole" + std::to_string(i) + " " + std::to_string(detectionResult.holeArea[i]).substr(0, 5),
+                pcl::PointXYZ(detectionResult.hole[i]->points[0].x, detectionResult.hole[i]->points[0].y,
+                    detectionResult.hole[i]->points[0].z + 0.1), 0.02, 0.0, 0.0, 1.0, "text_hole" + std::to_string(i), v2);
+            pcl::PointCloud<pcl::PointXYZRGB>::Ptr holePointCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+            pcl::copyPointCloud(*detectionResult.hole[i], *holePointCloud);
+            *mergedCloud += *holePointCloud;
+        }
+        QDateTime current_date_time = QDateTime::currentDateTime();
+        QString current_date_time_str = current_date_time.toString("hh:mm:ss");
+        int holeCount = detectionResult.hole.size();
+        int bulgeCount = detectionResult.bulge.size();
+        QString itemText = QString("%1 %2 Hole: %3 Bulge: %4").arg(projectManager.projectName()).arg(current_date_time_str).arg(holeCount).arg(bulgeCount) + QString((true == autoSavePointCloudDetect) ? "(保存)" : "");
+        QListWidgetItem* item = new QListWidgetItem(itemText);
+        ui.frameListWidget->addItem(item);
+
+        if (true == autoSavePointCloudDetect && QDir(projectManager.outputPath()).exists()) {
+            // Save merged point cloud as .pcd file
+            //QString filePath = projectManager.outputPath() + "/" + projectManager.projectName() + current_date_time_str + QString::number(ngNum)+".pcd";
+            QString filePath = projectManager.outputPath() + "/" + QString::number(ngNum) + ".pcd";
+            //pcl::io::savePCDFile(filePath.toStdString(), *mergedCloud);
+            // Create a separate thread to save the PCD file
+            //SavePCDThread* saveThread = new SavePCDThread(filePath, mergedCloud);
+            //saveThread->start();
+        }
+    }
+    viewer_->spin();
 }
 
 /*--------------------------------界面功能实现函数----------------------------*/
@@ -864,58 +1057,6 @@ void MainWindow::unableFileActions()
 }
 
 /*--------------------------------action可见性----------------------------*/
-void MainWindow::onTimerTimeout() {
-    PavementDetector* detector = new PavementDetector();
-    auto frames = pipe.wait_for_frames();
-    auto depth = frames.get_depth_frame();
-    auto color = frames.get_color_frame();
-    points = pc.calculate(depth);
-    auto cloud_xyzrgb = points_to_pcl_xyzrgb1(points, color);
-    auto cloud_xyz = points_to_pcl_xyz1(points);
-    viewer_->removeAllShapes();
-    viewer_->removeAllPointClouds();
-
-    int v1(0);
-    viewer_->createViewPort(0.0, 0.0, 0.5, 1.0, v1);
-    viewer_->setBackgroundColor(1.0, 1.0, 1.0, v1);
-    viewer_->addPointCloud(cloud_xyzrgb, "cloud_v1", v1);
-    //viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.0,1.0,0.0, "cloud");
-    detector->detect(cloud_xyz);
-    DetectionResult detectionResult = detector->getResult();
-
-    int v2(0);
-    viewer_->createViewPort(0.5, 0.0, 1.0, 1.0, v2);
-    viewer_->setBackgroundColor(1.0, 1.0, 1.0, v2);
-    viewer_->addPointCloud(cloud_xyzrgb, "cloud_v2", v2);
-
-    if (detectionResult.code == DETECTION_NG) {
-        // Add each point cloud in bulge to the viewer with a green color
-        for (size_t i = 0; i < detectionResult.bulge.size(); ++i)
-        {
-            std::string cloud_name = "bulge_" + std::to_string(i);
-            viewer_->addPointCloud<pcl::PointXYZ>(detectionResult.bulge[i], cloud_name, v2);
-            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, cloud_name);
-            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, cloud_name);
-            viewer_->addText3D("bulge" + std::to_string(i) + " " + std::to_string(detectionResult.bulgeArea[i]).substr(0, 5),
-                pcl::PointXYZ(detectionResult.bulge[i]->points[0].x, detectionResult.bulge[i]->points[0].y,
-                    detectionResult.bulge[i]->points[0].z + 0.1), 0.02, 0.0, 0.0, 1.0, "text_bulge" + std::to_string(i), v2);
-
-        }
-
-        // Add each point cloud in hole to the viewer with a red color
-        for (size_t i = 0; i < detectionResult.hole.size(); ++i)
-        {
-            std::string cloud_name = "hole_" + std::to_string(i);
-            viewer_->addPointCloud<pcl::PointXYZ>(detectionResult.hole[i], cloud_name, v2);
-            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, cloud_name);
-            viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, cloud_name);
-            viewer_->addText3D("hole" + std::to_string(i) + " " + std::to_string(detectionResult.holeArea[i]).substr(0, 5),
-                pcl::PointXYZ(detectionResult.hole[i]->points[0].x, detectionResult.hole[i]->points[0].y,
-                    detectionResult.hole[i]->points[0].z + 0.1), 0.02, 0.0, 0.0, 1.0, "text_hole" + std::to_string(i), v2);
-        }
-    }
-    viewer_->spin();
-}
 
 
 

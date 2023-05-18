@@ -31,7 +31,7 @@ signals:
 private slots:
     void updateImage(const cv::Mat& image1, const cv::Mat& image2);
     
-    void updatePonitCloudFrame(DetectionResult detectionResult,  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_xyzrgb);
+    //void updatePonitCloudFrame(DetectionResult detectionResult,  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_xyzrgb);
     
     void clearPlayer();
 
@@ -60,6 +60,8 @@ private slots:
     void on_action_newProj_triggered();
     void on_action_newSln_triggered();
     void on_action_openProj_triggered();
+    void on_actionAuto_Save_triggered();
+    void on_action_openOutputDir_triggered();
     void on_action_pointcloud_detect_triggered();
     /*action槽函数*/
 
@@ -81,6 +83,18 @@ private:
     QList<QAction*> fileRelatedActions;
     QList<QAction*> detectRelatedActions;
 
+    rs2::pipeline pipe_;
+    rs2::pointcloud pc_;
+    rs2::points points_;
+    QVTKOpenGLNativeWidget* qvtkWidget;
+    QTimer* pointCloudDetectTimer_;
+    pcl::visualization::PCLVisualizer::Ptr viewer_;
+
+    bool autoSavePointCloudDetect = false;
+
+    int ngNum = 0;
+
+private:
     void _setupActionList();
     void _setupToolBarAndStatusBar();
     void _setupFileManager();
@@ -90,14 +104,8 @@ private:
     //卸载当前的检测
     void on_actionUnload_withoutAsk();
 
-    void onTimerTimeout();
-    rs2::pipeline pipe;
-    rs2::pointcloud pc;
-    rs2::points points;
-    QVTKOpenGLNativeWidget* qvtkWidget;
-    QTimer* timer_;
-    pcl::visualization::PCLVisualizer::Ptr viewer_;
-
+    void onDetectTimerTimeout();
+    
     // 切换到序号idx对应的帧
     bool switchFrame(int idx);
 
