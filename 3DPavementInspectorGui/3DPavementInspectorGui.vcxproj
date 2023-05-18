@@ -134,6 +134,9 @@
   <ItemGroup>
     <QtMoc Include="controllers\PointCloudCameraManager.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="controllers\SavePCDThread.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">
     <Import Project="$(QtMsBuild)\qt.targets" />

@@ -82,4 +82,9 @@
       <Filter>controllers</Filter>
     </QtMoc>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="controllers\SavePCDThread.h">
+      <Filter>controllers</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>
