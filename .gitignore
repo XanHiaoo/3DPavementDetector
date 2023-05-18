@@ -362,3 +362,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /pclVtkBuildTest
+/3DPavementInspectorGui/qianhuroad
+/3DPavementInspectorGui/玉泉路
+/3DPavementInspectorGui/钱湖南路
