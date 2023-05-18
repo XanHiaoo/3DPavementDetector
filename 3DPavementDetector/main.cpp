@@ -40,9 +40,8 @@ pcl_ptr points_to_pcl(const rs2::points& points)
 int main()
 {
     // 初始化可视化器
-    //pcl::visualization::PCLVisualizer::Ptr viewer;
     pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
-    viewer->setBackgroundColor(1.0, 0.5, 1.0);
+    viewer->setBackgroundColor(1.0, 1.0, 1.0);
     viewer->setCameraPosition(0, 0, -2, 0, 0, 0);
 
     // Declare pointcloud object, for calculating pointclouds and texture mappings
@@ -67,31 +66,9 @@ int main()
         points = pc.calculate(depth);
 
         auto cloud = points_to_pcl(points);
-        detector->detect(cloud);
-        DetectionResult detectionResult = detector->getResult();
-        cout << detectionResult.bulgeNum << endl << detectionResult.holeNum << endl;
-        // Set up colors for the point clouds
-        pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> green_color(0, 255, 0);
-        pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> red_color(255, 0, 0);
+        detector->detect(cloud,viewer);
 
-        viewer->removeAllShapes();
-        viewer->removeAllPointClouds();
-        // Add each point cloud in bulge to the viewer with a green color
-        for (size_t i = 0; i < detectionResult.bulge.size(); ++i)
-        {
-            std::string cloud_name = "bulge_" + std::to_string(i);
-            viewer->addPointCloud<pcl::PointXYZ>(detectionResult.bulge[i], green_color, cloud_name);
-            viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, cloud_name);
-        }
-
-        // Add each point cloud in hole to the viewer with a red color
-        for (size_t i = 0; i < detectionResult.hole.size(); ++i)
-        {
-            std::string cloud_name = "hole_" + std::to_string(i);
-            viewer->addPointCloud<pcl::PointXYZ>(detectionResult.hole[i], red_color, cloud_name);
-            viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, cloud_name);
-        }
-        viewer->spinOnce();
+        viewer->spinOnce(33);
     }
     return 0;
 }
