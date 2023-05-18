@@ -57,7 +57,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr filterPointCloud(pcl::PointCloud<pcl::PointX
     sor_voxel.filter(*cloud_filtered);
 
     if (cloud->size() == cloud_filtered->size()) {
-        sor_voxel.setLeafSize(0.5f, 0.5f, 0.5f);
+        sor_voxel.setLeafSize(1.0f, 1.0f, 1.0f);
         sor_voxel.filter(*cloud_filtered);
     }
 
