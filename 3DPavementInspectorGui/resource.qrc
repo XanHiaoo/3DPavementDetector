@@ -50,5 +50,7 @@
 		<file>icons/openproject.png</file>
 		<file>icons/jiankong.png</file>
 		<file>icons/detect.png</file>
-    </qresource>
+		<file>icons/pointcloud.png</file>
+		<file>icons/output.png</file>
+		</qresource>
 </RCC>
