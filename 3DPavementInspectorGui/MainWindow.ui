@@ -1,0 +1,468 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1280</width>
+    <height>720</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>三维道路检测</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="resource.qrc">
+    <normaloff>:/icons/icons/detect.png</normaloff>:/icons/icons/detect.png</iconset>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout_5" stretch="8,2">
+      <property name="sizeConstraint">
+       <enum>QLayout::SetDefaultConstraint</enum>
+      </property>
+      <item>
+       <widget class="QDockWidget" name="playerDockWidget">
+        <widget class="QWidget" name="dockWidgetContents_3">
+         <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0">
+          <item>
+           <widget class="QLabel" name="image_player">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Ignored" vsizetype="Ignored">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+            <property name="scaledContents">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPlainTextEdit" name="TipsplainTextEdit">
+        <property name="styleSheet">
+         <string notr="true">background-color: transparent;</string>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+        <property name="plainText">
+         <string/>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1280</width>
+     <height>26</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu_file">
+    <property name="title">
+     <string>文件(&amp;F)</string>
+    </property>
+    <addaction name="action_newSln"/>
+    <addaction name="action_newProj"/>
+    <addaction name="action_openProj"/>
+    <addaction name="actionOpen_File"/>
+    <addaction name="actionOpen_Dir"/>
+    <addaction name="actionAuto_Save"/>
+    <addaction name="action_Unload"/>
+    <addaction name="separator"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menu_edit">
+    <property name="title">
+     <string>编辑(&amp;E)</string>
+    </property>
+    <addaction name="separator"/>
+    <addaction name="actionZoom_in"/>
+    <addaction name="actionZoom_out"/>
+    <addaction name="actionFit_Window"/>
+    <addaction name="separator"/>
+    <addaction name="actionPrevious_Image"/>
+    <addaction name="actionNext_Image"/>
+   </widget>
+   <widget class="QMenu" name="menu_help">
+    <property name="title">
+     <string>帮助(&amp;H)</string>
+    </property>
+    <addaction name="actionAbout"/>
+   </widget>
+   <addaction name="menu_file"/>
+   <addaction name="menu_edit"/>
+   <addaction name="menu_help"/>
+  </widget>
+  <widget class="QToolBar" name="mainToolBar">
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="action_newSln"/>
+   <addaction name="action_newProj"/>
+   <addaction name="action_openProj"/>
+   <addaction name="actionOpen_File"/>
+   <addaction name="actionOpen_Dir"/>
+   <addaction name="separator"/>
+   <addaction name="actionAuto_Save"/>
+   <addaction name="actionLoad"/>
+   <addaction name="action_Unload"/>
+   <addaction name="separator"/>
+   <addaction name="action_run"/>
+   <addaction name="action_pause"/>
+   <addaction name="separator"/>
+   <addaction name="actionPrevious_Image"/>
+   <addaction name="actionNext_Image"/>
+   <addaction name="separator"/>
+   <addaction name="actionZoom_in"/>
+   <addaction name="actionZoom_out"/>
+   <addaction name="actionFit_Window"/>
+   <addaction name="actionAbout"/>
+   <addaction name="action_openCamera"/>
+   <addaction name="action_pointcloud_detect"/>
+  </widget>
+  <widget class="QStatusBar" name="statusBar"/>
+  <widget class="QDockWidget" name="frameDockWidget">
+   <property name="minimumSize">
+    <size>
+     <width>200</width>
+     <height>128</height>
+    </size>
+   </property>
+   <property name="windowTitle">
+    <string>检测帧</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_anno">
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <widget class="QListWidget" name="frameListWidget"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QDockWidget" name="cameraDockWidget">
+   <property name="minimumSize">
+    <size>
+     <width>200</width>
+     <height>128</height>
+    </size>
+   </property>
+   <property name="windowTitle">
+    <string>相机列表</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_label">
+    <layout class="QVBoxLayout" name="verticalLayout_3">
+     <item>
+      <widget class="QListWidget" name="cameraListWidget"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QDockWidget" name="fileDockWidget">
+   <property name="windowTitle">
+    <string>文件列表</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents">
+    <layout class="QVBoxLayout" name="verticalLayout_4">
+     <item>
+      <widget class="QListWidget" name="fileListWidget"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <action name="actionOpen_File">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/file.png</normaloff>:/icons/icons/file.png</iconset>
+   </property>
+   <property name="text">
+    <string>打开文件</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="actionOpen_Dir">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/open.png</normaloff>:/icons/icons/open.png</iconset>
+   </property>
+   <property name="text">
+    <string>打开文件夹</string>
+   </property>
+   <property name="toolTip">
+    <string>打开文件夹</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+D</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/quit.png</normaloff>:/icons/icons/quit.png</iconset>
+   </property>
+   <property name="text">
+    <string>退出</string>
+   </property>
+   <property name="toolTip">
+    <string>退出</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="actionSave_As">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/save-as.png</normaloff>:/icons/icons/save-as.png</iconset>
+   </property>
+   <property name="text">
+    <string>Save As</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+S</string>
+   </property>
+  </action>
+  <action name="actionAuto_Save">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/save.png</normaloff>:/icons/icons/save.png</iconset>
+   </property>
+   <property name="text">
+    <string>自动保存</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/help.png</normaloff>:/icons/icons/help.png</iconset>
+   </property>
+   <property name="text">
+    <string>关于</string>
+   </property>
+  </action>
+  <action name="actionZoom_in">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/zoom-in.png</normaloff>:/icons/icons/zoom-in.png</iconset>
+   </property>
+   <property name="text">
+    <string>放大</string>
+   </property>
+  </action>
+  <action name="actionZoom_out">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/zoom-out.png</normaloff>:/icons/icons/zoom-out.png</iconset>
+   </property>
+   <property name="text">
+    <string>缩小</string>
+   </property>
+  </action>
+  <action name="actionFit_Window">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/zoom.png</normaloff>:/icons/icons/zoom.png</iconset>
+   </property>
+   <property name="text">
+    <string>自适应大小</string>
+   </property>
+  </action>
+  <action name="action_Unload">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/unload.png</normaloff>:/icons/icons/unload.png</iconset>
+   </property>
+   <property name="text">
+    <string>卸载</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+W</string>
+   </property>
+  </action>
+  <action name="actionPrevious_Image">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/prev.png</normaloff>:/icons/icons/prev.png</iconset>
+   </property>
+   <property name="text">
+    <string>上一帧</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Left</string>
+   </property>
+  </action>
+  <action name="actionNext_Image">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/next.png</normaloff>:/icons/icons/next.png</iconset>
+   </property>
+   <property name="text">
+    <string>下一帧</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Right</string>
+   </property>
+  </action>
+  <action name="actionLoad">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/load.png</normaloff>:/icons/icons/load.png</iconset>
+   </property>
+   <property name="text">
+    <string>装载</string>
+   </property>
+   <property name="iconText">
+    <string>Load</string>
+   </property>
+   <property name="toolTip">
+    <string>装载</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+L</string>
+   </property>
+  </action>
+  <action name="action_run">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/run1.png</normaloff>:/icons/icons/run1.png</iconset>
+   </property>
+   <property name="text">
+    <string>运行</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
+   </property>
+  </action>
+  <action name="action_pause">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/pause1.png</normaloff>:/icons/icons/pause1.png</iconset>
+   </property>
+   <property name="text">
+    <string>暂停</string>
+   </property>
+  </action>
+  <action name="action_openCamera">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/jiankong.png</normaloff>:/icons/icons/jiankong.png</iconset>
+   </property>
+   <property name="text">
+    <string>深度相机</string>
+   </property>
+   <property name="toolTip">
+    <string>深度相机</string>
+   </property>
+  </action>
+  <action name="action_newProj">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/newproj.png</normaloff>:/icons/icons/newproj.png</iconset>
+   </property>
+   <property name="text">
+    <string>新建项目</string>
+   </property>
+   <property name="toolTip">
+    <string>新建项目</string>
+   </property>
+  </action>
+  <action name="action_openProj">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/openproject.png</normaloff>:/icons/icons/openproject.png</iconset>
+   </property>
+   <property name="text">
+    <string>打开工程</string>
+   </property>
+   <property name="toolTip">
+    <string>打开工程</string>
+   </property>
+  </action>
+  <action name="action_newSln">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/icons/icons/solution.png</normaloff>:/icons/icons/solution.png</iconset>
+   </property>
+   <property name="text">
+    <string>新建解决方案</string>
+   </property>
+   <property name="toolTip">
+    <string>新建解决方案</string>
+   </property>
+  </action>
+  <action name="action_pointcloud_detect">
+   <property name="text">
+    <string>打开点云检测</string>
+   </property>
+  </action>
+  <zorder>frameDockWidget</zorder>
+  <zorder>cameraDockWidget</zorder>
+  <zorder>fileDockWidget</zorder>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources>
+  <include location="resource.qrc"/>
+ </resources>
+ <connections/>
+</ui>
