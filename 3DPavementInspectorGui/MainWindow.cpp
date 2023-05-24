@@ -1,38 +1,44 @@
 ﻿#include "MainWindow.h"
 #include "ui_mainwindow.h"
-#include <QDebug>
-#include <QFile>
-#include <QFileInfo>
+
+#include <QDesktopServices>
+#include <QXmlStreamWriter>
+#include <QStandardPaths>
+#include <QTextStream>
+#include <QInputDialog>
+#include <QDockWidget>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QFileInfo>
 #include <QDateTime>
+#include <QTimer>
+#include <QDebug>
+#include <QFile>
 #include <QDir>
-#include <QTextStream>
-#include <QInputDialog>
-#include <QXmlStreamWriter>
-#include <QStandardPaths>
-#include <QDockWidget>
+#include <QUrl>
+
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/visualization/vtk.h>
+#include <pcl/io/pcd_io.h>  
+#include <pcl/point_types.h> 
+
 #include <QVTKOpenGLNativeWidget.h>
 #include <vtkGenericOpenGLRenderWindow.h>
 #include <QVTKOpenGLNativeWidget.h>
-#include <pcl/visualization/pcl_visualizer.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderer.h>
 #include <vtkOpenGLRenderer.h>
 #include <vtkSmartPointer.h>
-#include <pcl/io/pcd_io.h>  
-#include <pcl/point_types.h> 
+
 #include <librealsense2/rs.hpp>
+
 #include <chrono>
 #include <thread>   
-#include <QTimer>
-#include <pcl/visualization/vtk.h>
+
 #include "widgets/NewSolutionDialog.h"
-#include <QDesktopServices>
-#include <QUrl>
 #include "controllers/SavePCDThread.h"
 
 using pcl_ptr_xyzrgb = pcl::PointCloud<pcl::PointXYZRGB>::Ptr;
@@ -129,7 +135,8 @@ void MainWindow::_setupActionList()
         << ui.action_pause
         << ui.actionPrevious_Image
         << ui.action_Unload
-        << ui.actionLoad;
+        << ui.actionLoad
+        << ui.action_openOutputDir;
 
     allRelatedActions << ui.actionOpen_File
         << ui.actionOpen_Dir
@@ -142,7 +149,8 @@ void MainWindow::_setupActionList()
         << ui.action_openCamera
         << ui.actionPrevious_Image
         << ui.action_Unload
-        << ui.actionLoad;
+        << ui.actionLoad
+        <<ui.action_openOutputDir;
 
 }
 
@@ -457,58 +465,6 @@ void MainWindow::on_actionOpen_Dir_triggered()
 
 void MainWindow::on_action_run_triggered()
 {
-    if (cameraManager.getMode() == cameraOpen) {
-        if (!timer.isActive()) {
-            if (!capture.isOpened()) {
-                if (fileManager.count() > 0) {
-                    QString currentFile = fileManager.getCurrentImageFile();
-                    if (fileManager.getMode() == Video) {
-                        // If the current file is a video, open it using cv::VideoCapture
-                        capture.open(currentFile.toStdString());
-                    }
-                    else {
-                        // If the current file is a folder, play all image files as a video
-                        QStringList imageFiles = fileManager.allImageFiles();
-                        if (imageFiles.length() > 0) {
-                            std::vector<cv::Mat> frames;
-                            for (const QString& fileName : imageFiles) {
-                                cv::Mat frame = cv::imread(fileName.toStdString());
-                                if (frame.empty()) {
-                                    // Skip empty frames
-                                    continue;
-                                }
-                                frames.push_back(frame);
-                            }
-                            if (frames.size() > 0) {
-                                // Create a video writer and write the frames as a video
-                                cv::VideoWriter writer;
-                                QString outputPath = fileManager.getDir(currentFile) + "output.avi";
-                                int codec = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
-                                writer.open(outputPath.toStdString(), codec, 30, frames[0].size());
-                                if (writer.isOpened()) {
-                                    for (const cv::Mat& frame : frames) {
-                                        writer.write(frame);
-                                    }
-                                    writer.release();
-                                    capture.open(outputPath.toStdString());
-                                }
-                                else {
-                                    qWarning() << "Failed to open video writer for" << outputPath;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            connect(&timer, SIGNAL(timeout()), this, SLOT(update_frame()));
-
-            QDateTime current_date_time = QDateTime::currentDateTime();
-            QString current_date_time_str = current_date_time.toString("hh:mm:ss");
-            ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已开始检测离线序列");
-
-            timer.start(33); // 设置30fps的帧率
-        }
-    }
     if (pointCloudCameraManager.getMode() == PointCloudcameraOpen) {
         if (!pointCloudDetectTimer_->isActive()) {
             //pipe_.start();
@@ -517,6 +473,57 @@ void MainWindow::on_action_run_triggered()
             QString current_date_time_str = current_date_time.toString("hh:mm:ss");
             ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已继续三维检测");
         }
+    } 
+    else if (!timer.isActive()) {
+        if (!capture.isOpened()) {
+            if (fileManager.count() > 0) {
+                QString currentFile = fileManager.getCurrentImageFile();
+                if (fileManager.getMode() == Video) {
+                    // If the current file is a video, open it using cv::VideoCapture
+                    capture.open(currentFile.toStdString());
+                }
+                else {
+                    // If the current file is a folder, play all image files as a video
+                    QStringList imageFiles = fileManager.allImageFiles();
+                    if (imageFiles.length() > 0) {
+                        std::vector<cv::Mat> frames;
+                        for (const QString& fileName : imageFiles) {
+                            cv::Mat frame = cv::imread(fileName.toStdString());
+                            if (frame.empty()) {
+                                // Skip empty frames
+                                continue;
+                            }
+                            frames.push_back(frame);
+                        }
+                        if (frames.size() > 0) {
+                            // Create a video writer and write the frames as a video
+                            cv::VideoWriter writer;
+                            QString outputPath = fileManager.getDir(currentFile) + "output.avi";
+                            int codec = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
+                            writer.open(outputPath.toStdString(), codec, 30, frames[0].size());
+                            if (writer.isOpened()) {
+                                for (const cv::Mat& frame : frames) {
+                                    writer.write(frame);
+                                }
+                                writer.release();
+                                capture.open(outputPath.toStdString());
+                            }
+                            else {
+                                qWarning() << "Failed to open video writer for" << outputPath;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        connect(&timer, SIGNAL(timeout()), this, SLOT(update_frame()));
+
+        QDateTime current_date_time = QDateTime::currentDateTime();
+        QString current_date_time_str = current_date_time.toString("hh:mm:ss");
+        ui.TipsplainTextEdit->appendPlainText(current_date_time_str + "已开始检测离线序列");
+
+        timer.start(33); // 设置30fps的帧率
+
     }
 }
 
